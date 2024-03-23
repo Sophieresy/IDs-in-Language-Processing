@@ -34,7 +34,7 @@ accuracy <- aggregate(accuracy ~ Subject, data_acc, mean)
 accuracy
 accuracy$score <- accuracy$accuracy
 accuracy$accuracy <- NULL
-data <- left_join(data, accuracy, by.x=c("subj"))
+data <- left_join(data, accuracy, by=c("Subject"= "Subject"))
 
 ### remove participants with less than 70% accuracy 
 
