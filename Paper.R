@@ -34,7 +34,7 @@ accuracy <- aggregate(accuracy ~ Subject, data_acc, mean)
 accuracy
 accuracy$score <- accuracy$accuracy
 accuracy$accuracy <- NULL
-data <- left_join(data, accuracy, by=c("Subject"= "Subject"))
+data <- left_join(data, accuracy, by=c("Subject"= "Subject")) # changed by Sophie
 
 ### remove participants with less than 70% accuracy 
 
@@ -389,6 +389,7 @@ m.acc_imagination <- glmer(accuracy ~ Proficiency*Totalimagination+TotalSocialSk
                     
                   (1+Totalimagination||item) +  (1+Totalimagination||subj),
                 data = data_sub, family = binomial)
+isSingular(m.acc_imagination,tol = 1e-4)#Sophie tred was ist das überhaupt für eine toleranz
 summary(m.acc_imagination)
 
 #### model shows that imagination is not significant once controlling for the interaction
