@@ -83,6 +83,7 @@ data$accuracy_numeric <- as.numeric(as.character(data$accuracy))
 acc.summary_sub <- summarySEwithin(data, measurevar = "accuracy_numeric", withinvars = c( "condition_new","Subject","Proficiency"))
 acc.summary_sub
 
+nans <- subset(acc.summary_sub, N != 1)
 # how many subjects are proficient?
 
 acc.summary_subject <- summarySEwithin(data, measurevar = "accuracy_numeric", withinvars = c("Subject","Proficiency", "Condition"))
