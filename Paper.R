@@ -409,10 +409,10 @@ coefplot(m.acc_social, title ="Coeficient Plot Accuray Social",sort="alphabetica
 
 #Sophie did:
 m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
-                          Totalimagination*TotalSocialSkill +
+                          
                           (1+Totalimagination|item) + (1+Totalimagination|subj)+
                           (1+TotalSocialSkill|item) + (1+TotalSocialSkill|subj),
-                        data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list(iter.max=50000)))
+                        data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list( maxfun = 50000)))
 summary(m.acc_combined)
 coefplot(m.acc_combined, title ="Coeficient Plot Accuray combined",sort="alphabetical")
 #this model shows significant effect of social skill 
