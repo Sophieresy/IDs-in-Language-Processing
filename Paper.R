@@ -17,7 +17,7 @@ library(tidyr)
 library(labelled)
 library(MASS)
 library(Rmisc)
-
+library(coefplot)
 
 ### read in data 
 
@@ -366,18 +366,18 @@ m.acc <- glmer(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+TotalAttention
                (1|item),
             data = data_sub, family = binomial)
 summary(m.acc)
-
+coefplot(m.acc)
 
 #### now only add random slopes to significant predictors 
 
-m.acc1 <- glmer(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+Totalimagination+
+m.acc1 <- glmer(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+Totalimagination+  #problem: attention to detail & systemizing are correlated
                  TotalSystemizing+
                  
                  (0+TotalSocialSkill+TotalAttentionToDetail+Totalimagination+
                     TotalSystemizing|item),
                data = data_sub, family = binomial)
 summary(m.acc1)
-
+coefplot(m.acc1)
 ### model shows that only total social skill and imagination are significant at p<0.002
 
 ### now control for interaction of the two with proficiency in individual models
@@ -392,7 +392,8 @@ m.acc_imagination <- glmer(accuracy ~ Proficiency*Totalimagination+TotalSocialSk
                 data = data_sub, family = binomial)
 isSingular(m.acc_imagination,tol = 1e-4)#Sophie tred was ist das überhaupt für eine toleranz
 summary(m.acc_imagination)
-
+anova(m.acc1,m.acc_imagination)
+coefplot(m.acc_imagination, title ="Coeficient Plot Accuray imagination",sort="alphabetical")
 #### model shows that imagination is not significant once controlling for the interaction
 ### and adding the maximal random effect structure for imagination
 ### Totalimagination p= 0.007381 
@@ -403,7 +404,17 @@ m.acc_social <- glmer(accuracy ~ Proficiency*TotalSocialSkill+ Proficiency*Total
                         (0+TotalSocialSkill|item) +  (0+TotalSocialSkill|subj),
                       data = data_sub, family = binomial)
 summary(m.acc_social)
+coefplot(m.acc_social, title ="Coeficient Plot Accuray Social",sort="alphabetical")
 
+
+#Sophie did:
+m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
+                          Totalimagination*TotalSocialSkill +
+                          (1+Totalimagination|item) + (1+Totalimagination|subj)+
+                          (1+TotalSocialSkill|item) + (1+TotalSocialSkill|subj),
+                        data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list(iter.max=50000)))
+summary(m.acc_combined)
+coefplot(m.acc_combined, title ="Coeficient Plot Accuray combined",sort="alphabetical")
 #this model shows significant effect of social skill 
 ### TotalSocialSkill p=0.0000673
 
