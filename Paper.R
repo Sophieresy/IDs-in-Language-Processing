@@ -390,7 +390,7 @@ m.acc_imagination <- glmer(accuracy ~ Proficiency*Totalimagination+TotalSocialSk
                     
                   (1+Totalimagination||item) +  (1+Totalimagination||subj),
                 data = data_sub, family = binomial)
-isSingular(m.acc_imagination,tol = 1e-4)#Sophie tred was ist das überhaupt für eine toleranz
+
 summary(m.acc_imagination)
 anova(m.acc1,m.acc_imagination)
 coefplot(m.acc_imagination, title ="Coeficient Plot Accuray imagination",sort="alphabetical")
