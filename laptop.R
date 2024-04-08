@@ -10,7 +10,7 @@ library('ggbiplot')
 personality<- read.table(here::here("data", "data_L2_scalars.csv"), header=T, sep= ",")
 
 personality <- personality %>% distinct(Subject, .keep_all = TRUE)
-personality <- personality %>% select(TotalSocialSkill, TotalAttentionToDetail,TotalAttentionSwitching, TotalCommunication, Totalimagination, TotalSystemizing,  TotalExtraversion, TotalAgreeableness, TotalConscientiousness, TotalNeuroticism, TotalOpeness)
+personality <- personality %>% dplyr::select(TotalSocialSkill, TotalAttentionToDetail,TotalAttentionSwitching, TotalCommunication, Totalimagination, TotalSystemizing,  TotalExtraversion, TotalAgreeableness, TotalConscientiousness, TotalNeuroticism, TotalOpeness)
 
 
 ###correlation Matrix
@@ -21,7 +21,7 @@ corrplot(correlation$r, type="lower", order="hclust",diag=0,insig = "blank",addC
 personality <- scale(personality)
 pca1 <- psych::principal(personality, nfactors = 11, rotate = "none")
 summary(pca1)
-fviz_eig(pca1)
+
 round(pca1$values,2) # we have 6 values around 1 or bigger, so we keep 6
 eigenvalues <- pca1$values
 
