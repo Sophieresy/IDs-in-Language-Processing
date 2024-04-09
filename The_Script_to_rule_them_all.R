@@ -37,14 +37,58 @@ data <- subset(data,score>0.7)
 ##### check nr of participants 
 
 length(unique(data$Subject))
+### split T1 into logical and pragmatic responses
+data$Condition <- as.character(data$Condition)
+data$condition_new <- ifelse(data$Condition=="T1" & data$word4.RESP=="TRUE","T1_logic",
+                             ifelse(data$Condition=="T1" & data$word4.RESP=="FALSE","T1_pragmatic", data$Condition))
 
-# plot accuracy 
+data$condition_new <- as.factor(as.character(data$condition_new))
 
-#acc.summary <- summarySEwithin(data, measurevar = "accuracy", withinvars = c( "Condition","Proficiency"))
-#acc.summary
+# how many subjects are only logical or only pragmatic?
 
+data$accuracy_numeric <- as.numeric(as.character(data$accuracy))
+
+
+acc.summary_sub <- summarySEwithin(data, measurevar = "accuracy_numeric", withinvars = c( "condition_new","Subject","Proficiency"))
+acc.summary_sub
+
+nans <- subset(acc.summary_sub, N != 1)
+# how many subjects are proficient?
+
+acc.summary_subject <- summarySEwithin(data, measurevar = "accuracy_numeric", withinvars = c("Subject","Proficiency", "Condition"))
+acc.summary_subject
+
+
+# how many items per subject ?
+
+acc.summary_item <- summarySEwithin(data, measurevar = "accuracy_numeric", withinvars = c("item","Category","criticalWord"))
+acc.summary_item
+
+#### change values of correct to include only controls
+data$correct_new <- ifelse(data$Condition=="T1", 1, data$word4.ACC)
+
+
+#### fit  a logistic regression model to accuracy 
+
+##### change baseline to pragmatic condition and high proficiency 
+data$condition_new <- as.factor(data$condition_new)
 data$Proficiency <- as.factor(data$Proficiency)
 
+data$condition_new<- relevel(data$condition_new, "T1_pragmatic")
+data$Proficiency<- relevel(data$Proficiency, "high")
+
+
+###convert relevant columns to categorical
+data$subj <- as.factor(data$Subject)
+data$Condition <- as.factor(as.character(data$Condition))
+###code DV as categorical
+
+data$accuracy <- as.factor(data$accuracy)
+
+### sum contrast for proficiency 
+
+contrasts(data$Proficiency) <- contr.sum(2)/2
+contrasts(data$Proficiency)
 data$Proficiency<- relevel(data$Proficiency, "high")
 # until here we have the same outlier exclusion as the Paper
 
@@ -104,10 +148,12 @@ print(pca2)
 #RC5 Neuroticsm
 #RC6 Imagination, Agreeableness, Conscientiousness (openess)
 #plot
-#colnames(pca2$loadings) <- c("Agreeable & Concious (open)", "-Attention switching & + extraversion (open)", "Social Skill & Communication", "Attention to Detail & Systemizing", "Imagination", "Neuroticsm")
+#
 print(pca2)
 pca2_prcomp <- prcomp(pca2$scores)
 fviz_pca_biplot(pca2_prcomp,label="var", repel = TRUE)
+Data_sub_pca <- cbind(data_pca[,],pca2$scores)
+
 #############################################################
 ### K-means Cluster Analysis
 data_cluster <- data_sub %>% dplyr::select(Subject, word4.ACC, word4.RT, Age, TotalSocialSkill, TotalAttentionToDetail,TotalAttentionSwitching, TotalCommunication, Totalimagination, TotalSystemizing,  TotalExtraversion, TotalAgreeableness, TotalConscientiousness, TotalNeuroticism, TotalOpeness, Proficiency)
@@ -126,4 +172,14 @@ str(k2)
 
 data_cluster$cluster <- k2$cluster # adding the cluster to the data
 cluster_summary <- aggregate(. ~ cluster, data = data_cluster, FUN = function(x) c(mean = mean(x), var = var(x)))
+### Imagination and social skill 
 
+####combined Model 
+m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
+                          
+                          (1+Totalimagination|item) + (1+Totalimagination|subj)+
+                          (1+TotalSocialSkill|item) + (1+TotalSocialSkill|subj),
+                        data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list( maxfun = 50000)))
+summary(m.acc_combined)
+coefplot(m.acc_combined, title ="Coeficient Plot Accuray combined",sort="alphabetical")
+#has singularity issues, now try again with pca values
