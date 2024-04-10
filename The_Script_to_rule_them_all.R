@@ -11,8 +11,9 @@ library('factoextra')
 library('ggbiplot')
 #library('tidyverse')  
 library('cluster')    
-
-
+library(Rmisc)
+library(lme4)
+library(brms)
 ### read in data directly copied from the given Script
 
 data <- read.table(here::here("data", "data_L2_scalars.csv"), header=T, sep= ",")
@@ -108,7 +109,7 @@ data$Proficiency<- relevel(data$Proficiency, "high")
 data_sub <- subset(data, Condition=="T1")
 
 data_sub <- droplevels(data_sub)
-contrasts(data_sub$Proficiency) <- contr.sum(2)/2
+
 
 ###PCA
 ## since we have 11 personality measures, its likely that some of them are correlated
@@ -152,7 +153,7 @@ print(pca2)
 print(pca2)
 pca2_prcomp <- prcomp(pca2$scores)
 fviz_pca_biplot(pca2_prcomp,label="var", repel = TRUE)
-Data_sub_pca <- cbind(data_pca[,],pca2$scores)
+data_sub_pca <- cbind(data_sub[,],pca2$scores)
 
 #############################################################
 ### K-means Cluster Analysis
@@ -172,14 +173,56 @@ str(k2)
 
 data_cluster$cluster <- k2$cluster # adding the cluster to the data
 cluster_summary <- aggregate(. ~ cluster, data = data_cluster, FUN = function(x) c(mean = mean(x), var = var(x)))
-### Imagination and social skill 
+### K-means Cluster Analysis with PCA
+data_cluster_pca<- data_sub_pca %>% dplyr::select( word4.ACC, word4.RT, Age,RC1,RC2,RC3,RC4,RC5,RC6)
+data_kmeans_pca <- scale(data_cluster_pca)
+distance <- get_dist(data_kmeans_pca)
 
+fviz_nbclust(data_kmeans, kmeans, method = "wss")
+fviz_nbclust(data_kmeans, kmeans, method = "silhouette")
+gap_stat <- clusGap(data_kmeans, FUN = kmeans, nstart = 25,
+                    K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+
+cluster_pca <- kmeans(data_kmeans_pca, centers = 2, nstart = 25)
+fviz_cluster(cluster_pca, data = data_kmeans_pca)
+str(cluster_pca)
+
+### Imagination and social skill 
+###simple model with no random slopes from paper
+m.acc <- glmer(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+TotalAttentionSwitching+TotalCommunication+Totalimagination+
+                 TotalSystemizing+TotalExtraversion+TotalAgreeableness+TotalConscientiousness+TotalNeuroticism+TotalOpeness+
+                 
+                 (1|item),
+               data = data_sub, family = binomial)
+summary(m.acc)
+coefplot(m.acc)
+
+#### now only add random slopes to significant predictors, but attention to detail & systemizing are correlated - Replace by their PC
+
+m.acc1 <- glmer(accuracy ~ TotalSocialSkill+Totalimagination+RC4+
+                  
+                  (0+TotalSocialSkill+Totalimagination+RC4|item),
+                data = data_sub_pca, family = binomial)
+summary(m.acc1)
 ####combined Model 
 m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
                           
                           (1+Totalimagination|item) + (1+Totalimagination|subj)+
                           (1+TotalSocialSkill|item) + (1+TotalSocialSkill|subj),
-                        data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list( maxfun = 50000)))
+                        data = data_sub, family = binomial,control=glmerControl( optCtrl=list( maxfun = 50000)))
 summary(m.acc_combined)
-coefplot(m.acc_combined, title ="Coeficient Plot Accuray combined",sort="alphabetical")
+
+# Using brm
+
+
+
+#coefplot(m.acc_combined, title ="Coeficient Plot Accuray combined",sort="alphabetical")
 #has singularity issues, now try again with pca values
+
+m.acc <- glmer(accuracy ~ RC1+RC2+RC3+RC4+RC5+RC6+
+                 
+                 (1|item),
+               data = data_sub_pca, family = binomial)
+summary(m.acc)
+coefplot(m.acc)
