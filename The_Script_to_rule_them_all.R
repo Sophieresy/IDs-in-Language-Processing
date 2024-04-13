@@ -13,7 +13,7 @@ library('ggbiplot')
 library('cluster')    
 library(Rmisc)
 library(lme4)
-library(brms)
+
 ### read in data directly copied from the given Script
 
 data <- read.table(here::here("data", "data_L2_scalars.csv"), header=T, sep= ",")
@@ -190,32 +190,50 @@ str(cluster_pca)
 
 ### Imagination and social skill 
 ###simple model with no random slopes from paper
-m.acc <- glmer(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+TotalAttentionSwitching+TotalCommunication+Totalimagination+
-                 TotalSystemizing+TotalExtraversion+TotalAgreeableness+TotalConscientiousness+TotalNeuroticism+TotalOpeness+
-                 
-                 (1|item),
+m.acc <- glm(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+TotalAttentionSwitching+TotalCommunication+Totalimagination+
+                 TotalSystemizing+TotalExtraversion+TotalAgreeableness+TotalConscientiousness+TotalNeuroticism+TotalOpeness,
                data = data_sub, family = binomial)
 summary(m.acc)
 coefplot(m.acc)
+m.acc_pca <- glm(accuracy ~ RC1+RC2+RC3+RC4+RC5+RC6,
+             data = data_sub_pca, family = binomial)
+summary(m.acc_pca)
+coefplot(m.acc)
 
-#### now only add random slopes to significant predictors, but attention to detail & systemizing are correlated - Replace by their PC
+m.acc <- glmer(accuracy ~ RC1+RC2+RC3+RC4+RC5+RC6+
+                 
+                 (1|item),
+               data = data_sub_pca, family = binomial)
+summary(m.acc)
 
-m.acc1 <- glmer(accuracy ~ TotalSocialSkill+Totalimagination+RC4+
-                  
-                  (0+TotalSocialSkill+Totalimagination+RC4|item),
-                data = data_sub_pca, family = binomial)
+#### now only significant predictors,
+m.acc1 <- glm(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+Totalimagination+  #problem: attention to detail & systemizing are correlated
+                  TotalSystemizing,
+                data = data_sub, family = binomial)
 summary(m.acc1)
+coefplot(m.acc1)
+#### now only significant predictors, but attention to detail & systemizing are correlated - Replace by their PC
+
+m.acc1_pca <- glm(accuracy ~ TotalSocialSkill+Totalimagination+RC4,
+                data = data_sub_pca, family = binomial)
+summary(m.acc1_pca)
 ####combined Model 
+m.acc_combined <- glm(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill,
+                        data = data_sub, family = binomial)
+summary(m.acc_combined)
+
+# combined using their approach:
 m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
                           
                           (1+Totalimagination|item) + (1+Totalimagination|subj)+
                           (1+TotalSocialSkill|item) + (1+TotalSocialSkill|subj),
-                        data = data_sub, family = binomial,control=glmerControl( optCtrl=list( maxfun = 50000)))
+                        data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list( maxfun = 50000)))
 summary(m.acc_combined)
-
-# Using brm
-
-
+#i think the random slopes on items are negligible as they should not induce much variation by the nature of the experiment
+m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
+(1+Totalimagination|subj) + (1+TotalSocialSkill|subj),
+                        data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list( maxfun = 50000)))
+summary(m.acc_combined)
 
 #coefplot(m.acc_combined, title ="Coeficient Plot Accuray combined",sort="alphabetical")
 #has singularity issues, now try again with pca values
