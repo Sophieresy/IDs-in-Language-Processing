@@ -9,16 +9,13 @@ library('ggplot2')
 library('dplyr')
 library('factoextra')
 library('ggbiplot')
-#library('tidyverse')  
 library('cluster')    
-library(Rmisc)
-library(lme4)
+library('Rmisc')
+library('lme4')
 
 ### read in data directly copied from the given Script
 
 data <- read.table(here::here("data", "data_L2_scalars.csv"), header=T, sep= ",")
-
-
 
 ### look at accuracy by participant excluding critical condition
 ### check for accuracy in fillers
@@ -51,19 +48,18 @@ data$accuracy_numeric <- as.numeric(as.character(data$accuracy))
 
 
 acc.summary_sub <- summarySEwithin(data, measurevar = "accuracy_numeric", withinvars = c( "condition_new","Subject","Proficiency"))
-acc.summary_sub
+#acc.summary_sub
 
-nans <- subset(acc.summary_sub, N != 1)
 # how many subjects are proficient?
 
 acc.summary_subject <- summarySEwithin(data, measurevar = "accuracy_numeric", withinvars = c("Subject","Proficiency", "Condition"))
-acc.summary_subject
+#acc.summary_subject
 
 
 # how many items per subject ?
 
 acc.summary_item <- summarySEwithin(data, measurevar = "accuracy_numeric", withinvars = c("item","Category","criticalWord"))
-acc.summary_item
+#acc.summary_item
 
 #### change values of correct to include only controls
 data$correct_new <- ifelse(data$Condition=="T1", 1, data$word4.ACC)
@@ -90,27 +86,19 @@ data$accuracy <- as.factor(data$accuracy)
 
 contrasts(data$Proficiency) <- contr.sum(2)/2
 contrasts(data$Proficiency)
-data$Proficiency<- relevel(data$Proficiency, "high")
-# until here we have the same outlier exclusion as the Paper
-
-
-####################################################################
-####################################################################
-##########################
-##########################
-####################################################################
+# End of Copy from the paper
+##############################################################
 ########################
-######### EXPLORATORY ANALYSIS looking at individual differences andv their effect on implicature derivation
+######### REANALYSIS looking at individual differences and their effect on implicature derivation
 ########
 #####
-
-####focus on T1 responses only, just like paper
+####focus on T1 responses only
 
 data_sub <- subset(data, Condition=="T1")
 
 data_sub <- droplevels(data_sub)
-
-
+contrasts(data_sub$Proficiency) <- contr.sum(2)/2
+#############################################################
 ###PCA
 ## since we have 11 personality measures, its likely that some of them are correlated
 data_pca <- data_sub %>% distinct(Subject, .keep_all = TRUE) #remove duplicate subjects
@@ -122,12 +110,12 @@ data_pca <- data_pca %>% dplyr::select(TotalSocialSkill, TotalAttentionToDetail,
 
 ##correlation Matrix
 correlation <- rcorr(as.matrix(data_pca))
-corrplot(correlation$r, type="lower", order="hclust",diag=0,insig = "blank",addCoef.col = 'black')
+corrplot(correlation$r, type="upper", order="hclust",diag=0,insig = "blank",addCoef.col = 'black',tl.srt=45,tl.col="black")
 
 ## Actual PCA
 #standardize the data
 data_pca <- scale(data_pca)
-##first run of PCA to determin how mamy Components to keep
+##first run of PCA to determine how mamy Components to keep
 pca1 <- psych::principal(data_pca, nfactors = 11, rotate = "none")
 summary(pca1)
 round(pca1$values,2) # we have 6 values around 1 or bigger, so we keep 6, ~Kaiser criterion
@@ -140,7 +128,7 @@ abline(h = 1, col = "red", lty = 2)  # Adds a horizontal line at eigenvalue = 1
 pca2 <- psych::principal(data_pca, nfactors = 6, rotate = "varimax", scores = TRUE) 
 print(pca2)
 
-# openesss loads into RC1 & RC3 almoast the same
+# openesss loads into RC1 & RC3 almost the same
 
 #RC1  Negative Attention switching, Positive extraversion (openess)
 #RC2 Social Skill, Communication
@@ -149,7 +137,7 @@ print(pca2)
 #RC5 Neuroticsm
 #RC6 Imagination, Agreeableness, Conscientiousness (openess)
 #plot
-#
+
 print(pca2)
 pca2_prcomp <- prcomp(pca2$scores)
 fviz_pca_biplot(pca2_prcomp,label="var", repel = TRUE)
@@ -157,53 +145,47 @@ data_sub_pca <- cbind(data_sub[,],pca2$scores)
 
 #############################################################
 ### K-means Cluster Analysis
-data_cluster <- data_sub %>% dplyr::select(Subject, word4.ACC, word4.RT, Age, TotalSocialSkill, TotalAttentionToDetail,TotalAttentionSwitching, TotalCommunication, Totalimagination, TotalSystemizing,  TotalExtraversion, TotalAgreeableness, TotalConscientiousness, TotalNeuroticism, TotalOpeness, Proficiency)
-data_kmeans <- scale(data_cluster[,2:15])
+data_cluster <- data_sub %>% dplyr::select( TotalSocialSkill, TotalAttentionToDetail,TotalAttentionSwitching, TotalCommunication, Totalimagination, TotalSystemizing,  TotalExtraversion, TotalAgreeableness, TotalConscientiousness, TotalNeuroticism, TotalOpeness, word4.ACC, Proficiency)
+data_kmeans <- scale(data_cluster[,1:12]) #
+#data_cluster <- data_sub %>% dplyr::select( word4.ACC, TotalSocialSkill, Totalimagination) # experimenting with only significant predictors
+#data_kmeans <- scale(data_cluster[,1:3])
 distance <- get_dist(data_kmeans)
-#fviz_dist(distance, gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+
 fviz_nbclust(data_kmeans, kmeans, method = "wss")
 fviz_nbclust(data_kmeans, kmeans, method = "silhouette")
 gap_stat <- clusGap(data_kmeans, FUN = kmeans, nstart = 25,
                     K.max = 10, B = 50)
 fviz_gap_stat(gap_stat)
+
 # after testing those recomended ones i chose the outcome of silhouette as these clusters did not overlap
 k2 <- kmeans(data_kmeans, centers = 2, nstart = 25)
-fviz_cluster(k2, data = data_kmeans)
+fviz_cluster(k2, data = data_kmeans,geom = "point",main = "K-Means Cluster",ggtheme= theme_minimal())
 str(k2)
 
 data_cluster$cluster <- k2$cluster # adding the cluster to the data
-cluster_summary <- aggregate(. ~ cluster, data = data_cluster, FUN = function(x) c(mean = mean(x), var = var(x)))
+cluster_summary <- aggregate(. ~ cluster, data = data_cluster, FUN = function(x) c(mean = mean(x)))
+cluster_summary
+
 ### K-means Cluster Analysis with PCA
-data_cluster_pca<- data_sub_pca %>% dplyr::select( word4.ACC, word4.RT, Age,RC1,RC2,RC3,RC4,RC5,RC6)
+data_cluster_pca<- data_sub_pca %>% dplyr::select( word4.ACC,RC1,RC2,RC3,RC4,RC5,RC6)
 data_kmeans_pca <- scale(data_cluster_pca)
 distance <- get_dist(data_kmeans_pca)
 
-fviz_nbclust(data_kmeans, kmeans, method = "wss")
-fviz_nbclust(data_kmeans, kmeans, method = "silhouette")
-gap_stat <- clusGap(data_kmeans, FUN = kmeans, nstart = 25,
+fviz_nbclust(data_kmeans_pca, kmeans, method = "wss")
+fviz_nbclust(data_kmeans_pca, kmeans, method = "silhouette")
+gap_stat <- clusGap(data_kmeans_pca, FUN = kmeans, nstart = 25,
                     K.max = 10, B = 50)
 fviz_gap_stat(gap_stat)
 
 cluster_pca <- kmeans(data_kmeans_pca, centers = 2, nstart = 25)
-fviz_cluster(cluster_pca, data = data_kmeans_pca)
+fviz_cluster(cluster_pca, data = data_kmeans_pca,geom = "point",main = "K-Means Cluster with pca",ggtheme= theme_minimal())
 str(cluster_pca)
-
+#############################################################
 ### Imagination and social skill 
 ###simple model with no random slopes from paper
 m.acc <- glm(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+TotalAttentionSwitching+TotalCommunication+Totalimagination+
                  TotalSystemizing+TotalExtraversion+TotalAgreeableness+TotalConscientiousness+TotalNeuroticism+TotalOpeness,
                data = data_sub, family = binomial)
-summary(m.acc)
-coefplot(m.acc)
-m.acc_pca <- glm(accuracy ~ RC1+RC2+RC3+RC4+RC5+RC6,
-             data = data_sub_pca, family = binomial)
-summary(m.acc_pca)
-coefplot(m.acc)
-
-m.acc <- glmer(accuracy ~ RC1+RC2+RC3+RC4+RC5+RC6+
-                 
-                 (1|item),
-               data = data_sub_pca, family = binomial)
 summary(m.acc)
 
 #### now only significant predictors,
@@ -211,16 +193,20 @@ m.acc1 <- glm(accuracy ~ TotalSocialSkill+TotalAttentionToDetail+Totalimaginatio
                   TotalSystemizing,
                 data = data_sub, family = binomial)
 summary(m.acc1)
-coefplot(m.acc1)
-#### now only significant predictors, but attention to detail & systemizing are correlated - Replace by their PC
+
+#### now only significant predictors, but attention to detail & systemizing are correlated -> Replace by their PC
 
 m.acc1_pca <- glm(accuracy ~ TotalSocialSkill+Totalimagination+RC4,
                 data = data_sub_pca, family = binomial)
 summary(m.acc1_pca)
 ####combined Model 
-m.acc_combined <- glm(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill,
+m.acc_combined <- glm(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +Proficiency*TotalAttentionToDetail + Proficiency*TotalSystemizing,
                         data = data_sub, family = binomial)
 summary(m.acc_combined)
+
+m.acc_combined_pca <- glm(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +Proficiency*RC4,
+                      data = data_sub_pca, family = binomial)
+summary(m.acc_combined_pca)
 
 # combined using their approach:
 m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
@@ -230,12 +216,111 @@ m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*To
                         data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list( maxfun = 50000)))
 summary(m.acc_combined)
 #i think the random slopes on items are negligible as they should not induce much variation by the nature of the experiment
-m.acc_combined <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
-(1+Totalimagination|subj) + (1+TotalSocialSkill|subj),
+m.acc_combined1 <- glmer(accuracy ~ Proficiency*Totalimagination + Proficiency*TotalSocialSkill +
+                          (1+Totalimagination|subj) + (1+TotalSocialSkill|subj),
                         data = data_sub, family = binomial,control=glmerControl(optimizer="bobyqa", optCtrl=list( maxfun = 50000)))
-summary(m.acc_combined)
+summary(m.acc_combined1)
 
-#coefplot(m.acc_combined, title ="Coeficient Plot Accuray combined",sort="alphabetical")
+
+# Significance level (alpha)
+alpha <- 0.05 /9
+
+# Calculate z-values
+z_values <- summary(m.acc_combined)$coefficients[, "z value"]
+
+# Find the critical z-value
+critical_z <- qnorm(alpha/2,lower.tail = FALSE)  # For a two-tailed test
+
+# Compare z-values to critical z-value
+significant_coefficients <- abs(z_values) > critical_z
+
+# Print significant coefficients
+significant_coefficients
+
+
+
+# Dividing data on the median of each variable
+data_sub$social <- ifelse(data_sub$TotalSocialSkill<5, "social","not social")
+data_sub$imagination <- ifelse(data_sub$Totalimagination>4, "good imagination","bad imagination")
+data_sub$detail <- ifelse(data_sub$TotalAttentionToDetail>5, "good detail attention","bad detail attention")
+data_sub$systemizing <- ifelse(data_sub$TotalSystemizing>74, "systemizing","not systemizing")
+data_sub$accuracy <- as.numeric(data_sub$accuracy)
+
+
+# plot Social skills
+acc.summary_social <- summarySEwithin(data_sub, measurevar = "accuracy", withinvars = c( "Proficiency","social"))
+acc.summary_social$accuracy <- acc.summary_social$accuracy-1 # Subtract 1 to align with the original accuracy scale
+
+pd <- position_dodge(0.4)
+ggplot(acc.summary_social, aes(x=Proficiency, y=accuracy, fill=social)) +
+  geom_bar(stat = "identity", position="dodge", colour="black", width = 0.4) +
+  scale_fill_manual(name="Social Skills", 
+                    breaks=c("social", "not social"),
+                    labels=c( "More social","Less social"),values=c("slateblue3", "indianred2", "slateblue3", "indianred2") )+ 
+  ggtitle("Average Implicature derivation rate: Social Skills") +
+  geom_errorbar(aes(ymin=accuracy-ci, ymax=accuracy+ci), width=.15, position = pd) +
+  coord_cartesian(ylim=c(0,1))+
+  scale_y_continuous(breaks=c(seq(0,1,0.1)))+
+  xlab("Proficiency") +
+  ylab("0 = Pragmatic                       1 = Logical") + 
+  theme(axis.title=element_text(face="bold", size="12"),
+        axis.text=element_text(face="bold", size="12"))
+#plot imagination
+acc.summary_imagination <- summarySEwithin(data_sub, measurevar = "accuracy", withinvars = c( "Proficiency","imagination"))
+acc.summary_imagination$accuracy <- acc.summary_imagination$accuracy-1
+pd <- position_dodge(0.4)
+ggplot(acc.summary_imagination, aes(x=Proficiency, y=accuracy, fill=imagination)) +
+  geom_bar(stat = "identity", position="dodge", colour="black", width = 0.4) +
+  scale_fill_manual(name="Imagination", 
+                    breaks=c("good imagination","bad imagination"),
+                    labels=c("High", "Low"),values=c("slateblue3", "indianred2", "slateblue3", "indianred2") )+ 
+  ggtitle("Average Implicature derivation rate: Imagination") +
+  geom_errorbar(aes(ymin=accuracy-ci, ymax=accuracy+ci), width=.15, position = pd) +
+  coord_cartesian(ylim=c(0,1))+
+  scale_y_continuous(breaks=c(seq(0,1,0.1)))+
+  xlab("Proficiency") +
+  ylab("0 = Pragmatic                       1 = Logical") + 
+  theme(axis.title=element_text(face="bold", size="12"),
+        axis.text=element_text(face="bold", size="12"))
+#plot detail
+acc.summary_detail <- summarySEwithin(data_sub, measurevar = "accuracy", withinvars = c( "Proficiency","detail"))
+acc.summary_detail$accuracy <- acc.summary_detail$accuracy-1
+
+pd <- position_dodge(0.4)
+ggplot(acc.summary_detail, aes(x=Proficiency, y=accuracy, fill=detail)) +
+  geom_bar(stat = "identity", position="dodge", colour="black", width = 0.4) +
+  scale_fill_manual(name="Attention to detail", 
+                    breaks=c("good detail attention","bad detail attention"),
+                    labels=c("High", "Low"),values=c("slateblue3", "indianred2", "slateblue3", "indianred2") )+ 
+  ggtitle("Average Implicature derivation rate: Attention to Detail") +
+  geom_errorbar(aes(ymin=accuracy-ci, ymax=accuracy+ci), width=.15, position = pd) +
+  coord_cartesian(ylim=c(0,1))+
+  scale_y_continuous(breaks=c(seq(0,1,0.1)))+
+  xlab("Proficiency") +
+  ylab("0 = Pragmatic                       1 = Logical") + 
+  theme(axis.title=element_text(face="bold", size="12"),
+        axis.text=element_text(face="bold", size="12"))
+
+#plot systemizing
+acc.summary_systemizing <- summarySEwithin(data_sub, measurevar = "accuracy", withinvars = c( "Proficiency","systemizing"))
+acc.summary_systemizing$accuracy <- acc.summary_systemizing$accuracy-1
+
+pd <- position_dodge(0.4)
+ggplot(acc.summary_systemizing, aes(x=Proficiency, y=accuracy, fill=systemizing)) +
+  geom_bar(stat = "identity", position="dodge", colour="black", width = 0.4) +
+  scale_fill_manual(name="Systemizing", 
+                    breaks=c("systemizing","not systemizing"),
+                    labels=c("High", "Low"),values=c("slateblue3", "indianred2", "slateblue3", "indianred2") )+ 
+  ggtitle("Average Implicature derivation rate: Systemizing") +
+  geom_errorbar(aes(ymin=accuracy-ci, ymax=accuracy+ci), width=.15, position = pd) +
+  coord_cartesian(ylim=c(0,1))+
+  scale_y_continuous(breaks=c(seq(0,1,0.1)))+
+  xlab("Proficiency") +
+  ylab("0 = Pragmatic                       1 = Logical") + 
+  theme(axis.title=element_text(face="bold", size="12"),
+        axis.text=element_text(face="bold", size="12"))
+
+
 #has singularity issues, now try again with pca values
 
 m.acc <- glmer(accuracy ~ RC1+RC2+RC3+RC4+RC5+RC6+
